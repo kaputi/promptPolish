@@ -17,6 +17,25 @@ CLAUDE_DIR="${HOME}/.claude"
 SKILLS_DEST="${CLAUDE_DIR}/skills"
 COMMANDS_DEST="${CLAUDE_DIR}/commands"
 
+# Built-in Claude Code slash commands. Custom commands with these names are
+# unreachable (the built-in always wins), so refuse to link them.
+# Keep in sync with the "Command naming" section of CLAUDE.md.
+BUILTIN_COMMANDS=(
+  help clear compact config cost model init review agents skills
+  memory permissions status bug feedback login logout exit quit
+  release-notes upgrade mcp hooks doctor ide pr-comments resume
+  vim terminal-setup add-dir migrate-installer
+)
+
+is_builtin() {
+  local name="$1"
+  local b
+  for b in "${BUILTIN_COMMANDS[@]}"; do
+    [[ "$name" == "$b" ]] && return 0
+  done
+  return 1
+}
+
 errors=0
 
 run() {
@@ -60,6 +79,12 @@ done
 
 for file in "$REPO_ROOT/commands"/*.md; do
   name="$(basename "$file")"
+  stem="${name%.md}"
+  if is_builtin "$stem"; then
+    printf 'ERROR /%s collides with a built-in slash command; refusing to link %s. Rename or prefix it.\n' "$stem" "$file" >&2
+    errors=$((errors + 1))
+    continue
+  fi
   link "$file" "$COMMANDS_DEST/$name" || true
 done
 

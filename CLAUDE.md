@@ -26,6 +26,16 @@ Edits to already-symlinked files take effect immediately. Only re-run `install.s
 - **Slash commands** are single `.md` files under `commands/`. Filename (minus `.md`) becomes the slash command name.
 - **Paste-in prompts** are plain markdown under `prompts/`. No frontmatter. Not installed anywhere — they're meant to be copied into a chat manually.
 
+## Command naming — avoid built-in collisions
+
+Custom slash commands **cannot shadow** Claude Code built-ins. Typing `/config` always triggers the built-in UI even if `commands/config.md` exists, so the file would be unreachable. Avoid these names:
+
+`help`, `clear`, `compact`, `config`, `cost`, `model`, `init`, `review`, `agents`, `skills`, `memory`, `permissions`, `status`, `bug`, `feedback`, `login`, `logout`, `exit`, `quit`, `release-notes`, `upgrade`, `mcp`, `hooks`, `doctor`, `ide`, `pr-comments`, `resume`, `vim`, `terminal-setup`, `add-dir`, `migrate-installer`
+
+For domain-adjacent names, prefix instead — `pp-config`, `my-review`, etc. Run `/help` in any session to see the current built-in set.
+
+`install.sh` refuses to link a command whose name is in this list. If Claude Code ships a new built-in, update the `BUILTIN_COMMANDS` array at the top of `install.sh` *and* the list above.
+
 ## Operating notes for Claude
 
 - Before authoring a new skill, invoke `superpowers:writing-skills`. It covers frontmatter, progressive disclosure, and verification — do not freelance the structure.
