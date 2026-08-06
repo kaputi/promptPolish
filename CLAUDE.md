@@ -5,10 +5,16 @@ Personal authoring workspace for Claude Code skills, slash commands, and paste-i
 ## Layout
 
 ```
-skills/<name>/SKILL.md   → symlinked to ~/.claude/skills/<name>/
-commands/<name>.md       → symlinked to ~/.claude/commands/<name>.md
+skills/<name>/SKILL.md   → symlinked to ~/.claude/skills/<name>-mine/
+commands/<name>.md       → symlinked to ~/.claude/commands/<name>-mine.md
 prompts/<name>.md        → NOT symlinked; copy/paste into a Claude Code message
 ```
+
+Everything installed from this repo gets the **`-mine` suffix** appended at link
+time. Repo filenames stay clean; `commands/trim-comments.md` is invoked as
+`/trim-comments-mine`. The suffix lives in the `SUFFIX` variable at the top of
+`install.sh` — change it there and the next run re-links everything and prunes
+the old names.
 
 ## Install
 
@@ -35,6 +41,10 @@ Custom slash commands **cannot shadow** Claude Code built-ins. Typing `/config` 
 For domain-adjacent names, prefix instead — `pp-config`, `my-review`, etc. Run `/help` in any session to see the current built-in set.
 
 `install.sh` refuses to link a command whose name is in this list. If Claude Code ships a new built-in, update the `BUILTIN_COMMANDS` array at the top of `install.sh` *and* the list above.
+
+In practice the `-mine` suffix already makes a built-in collision impossible — no built-in ends in `-mine`. The check is kept because it stays correct if `SUFFIX` is ever cleared, and it's checked against the *installed* name, not the repo filename.
+
+**Precedence, for context:** commands and skills resolve enterprise → personal (`~/.claude`) → project (`.claude`) → bundled. Personal wins over project, the opposite of `settings.json`. Since this repo installs into `~/.claude`, every name it claims is claimed globally for the user — a per-project `.claude/commands/<same-name>.md` would be shadowed and unreachable. The suffix keeps that footprint clearly namespaced.
 
 ## Operating notes for Claude
 

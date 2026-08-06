@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
 # Symlink skills/* and commands/*.md into ~/.claude/.
+# Everything installed from this repo gets $SUFFIX appended to its name, so
+# /trim-comments here becomes /trim-comments-mine when invoked.
 # Idempotent. Refuses to overwrite anything that isn't already our symlink.
 # Usage: ./install.sh [--dry-run]
 
 set -euo pipefail
+
+# Appended to every installed skill/command name. Repo filenames stay clean;
+# the suffix is applied here, at link time. Changing it re-links everything and
+# prunes the old names on the next run.
+SUFFIX="-mine"
 
 DRY_RUN=0
 case "${1:-}" in
@@ -38,6 +45,11 @@ is_builtin() {
 
 errors=0
 
+# Destination paths this run intends to own. Anything else in ~/.claude that
+# points back into this repo is stale (renamed, deleted, or suffix changed) and
+# gets pruned at the end.
+declare -A EXPECTED=()
+
 run() {
   if (( DRY_RUN )); then
     printf 'DRY-RUN: %s\n' "$*"
@@ -48,6 +60,7 @@ run() {
 
 link() {
   local src="$1" dst="$2"
+  EXPECTED["$dst"]=1
   if [[ -L "$dst" ]]; then
     local current
     current="$(readlink "$dst")"
@@ -74,18 +87,33 @@ shopt -s nullglob
 
 for dir in "$REPO_ROOT/skills"/*/; do
   name="$(basename "$dir")"
-  link "${dir%/}" "$SKILLS_DEST/$name" || true
+  link "${dir%/}" "$SKILLS_DEST/${name}${SUFFIX}" || true
 done
 
 for file in "$REPO_ROOT/commands"/*.md; do
-  name="$(basename "$file")"
-  stem="${name%.md}"
-  if is_builtin "$stem"; then
-    printf 'ERROR /%s collides with a built-in slash command; refusing to link %s. Rename or prefix it.\n' "$stem" "$file" >&2
+  stem="$(basename "$file" .md)"
+  installed="${stem}${SUFFIX}"
+  # With a non-empty SUFFIX a collision is impossible, but the check stays
+  # correct if SUFFIX is ever cleared.
+  if is_builtin "$installed"; then
+    printf 'ERROR /%s collides with a built-in slash command; refusing to link %s. Rename or prefix it.\n' "$installed" "$file" >&2
     errors=$((errors + 1))
     continue
   fi
-  link "$file" "$COMMANDS_DEST/$name" || true
+  link "$file" "$COMMANDS_DEST/${installed}.md" || true
+done
+
+# Remove symlinks in ~/.claude that point into this repo but are no longer
+# expected — leftovers from a rename, a deleted file, or an old SUFFIX. Links
+# pointing anywhere else are none of our business and are left alone.
+for dest_dir in "$SKILLS_DEST" "$COMMANDS_DEST"; do
+  for entry in "$dest_dir"/*; do
+    [[ -L "$entry" ]] || continue
+    [[ "$(readlink "$entry")" == "$REPO_ROOT/"* ]] || continue
+    [[ -n "${EXPECTED["$entry"]:-}" ]] && continue
+    run rm "$entry"
+    printf 'prune %s (stale link into this repo)\n' "$entry"
+  done
 done
 
 if (( errors > 0 )); then
